@@ -20,6 +20,8 @@ struct Mem { //the mem the "computer" will need to use"
 	static constexpr u32 MAX_MEM = 1024 * 64; //this gives full valid addr to 65535
 	Byte Data[MAX_MEM];
 
+	
+
 	void initialize() {
 		for (u32 i = 0; i < MAX_MEM; ++i) {
 			Data[i] = 0;
@@ -33,6 +35,12 @@ struct Mem { //the mem the "computer" will need to use"
 	//write 1 byte
 	Byte& operator[](u32 Address) {
 		return Data[Address];
+	}
+	//write 2 bytes
+	void WriteWord(u32& Cycles, Word Value, u32 Address) {
+		Data[Address] = Value & 0xFF;
+		Data[Address + 1] = (Value >> 8);
+		Cycles -= 2;
 	}
 };
 
@@ -66,14 +74,33 @@ struct CPU {
 		--Cycles;
 		return Data;
 	}
+	Word FetchWord(u32& Cycles, Mem& m) {
+		//little endian
+		Word Data = m[PC];
+		++PC;
+		--Cycles;
+
+		Data |= (m[PC] << 8);//shift up 8 bits
+		++PC;
+
+		Cycles -= 2;
+
+		//if you want to handle endianness you will swap bytes here
+
+		return Data;
+	}
+
 	Byte ReadByte(Mem& m, u32& cycles, Byte Address) {
 		Byte Data = m[Address];
 		--cycles;
 		return Data;
 	}
+	static constexpr Byte
+		INS_LDA_IM = 0xA9,//OpCode load accumulator immediate mode 2 cycles
+		INS_LDA_ZP = 0xA5, //zero page  3 cycles
+		INS_LDA_ZPX = 0xB5, //zero page x 4 cycles
+		INS_JSR = 0x20; // 3 bytes and 6 cycles
 
-	static constexpr Byte  INS_LDA_IM = 0xA9;//OpCode load accumulator immediate mode
-	static constexpr Byte INS_LDA_ZP = 0xA5;//Opcode load accymulator zero page
 
 	void LDASetStatus() {
 		Z = (Accum == 0);
@@ -82,6 +109,7 @@ struct CPU {
 	void Execute(u32 Cycles, Mem& m) {
 		while (Cycles > 0) {
 			//fetch the next instruction from mem wherever program counter is
+			//Part of LOAD accumulator with memory
 			Byte Instruction = Fetch(m, Cycles);
 			/*(void)Instruction;*/
 			switch (Instruction) {
@@ -95,6 +123,21 @@ struct CPU {
 				Byte ZeroPageAddress = Fetch(m, Cycles);
 				Accum = ReadByte(m, Cycles, ZeroPageAddress);
 				LDASetStatus();
+			}break;
+			case INS_LDA_ZPX: {
+				Byte ZeroPageAddress = Fetch(m, Cycles);
+				ZeroPageAddress += X;
+				--Cycles;
+				Accum = ReadByte(m, Cycles, ZeroPageAddress);
+				LDASetStatus();
+			}break;
+			case INS_JSR: {
+				Word SubAddress = FetchWord(Cycles, m);
+				m.WriteWord(Cycles, PC - 1, SP);//this just does whats below
+				/*m[SP] = PC - 1;
+				--Cycles;*/
+				PC = SubAddress;
+				--Cycles;
 			}break;
 			default:
 				printf("Instruction not handled");
@@ -112,10 +155,15 @@ int main() {
 	newCpu.Reset(mem);
 	/*mem[0xFFFC] = CPU::INS_LDA_IM;
 	mem[0xFFFD] = 0x42;*/
-	mem[0xFFFC] = CPU::INS_LDA_ZP;
+	//mem[0xFFFC] = CPU::INS_LDA_ZP;
+	//mem[0xFFFD] = 0x42;
+	//mem[0x0042] = 84;
+	mem[0xFFFC] = CPU::INS_JSR;
 	mem[0xFFFD] = 0x42;
-	mem[0x0042] = 84;
-	newCpu.Execute(3, mem);
+	mem[0xFFFE] = 0x42;
+	mem[0x4242] = CPU::INS_LDA_IM;
+	mem[0x4243] = 0x84;
+	newCpu.Execute(9, mem); //get total num of instructions required
 
 	return 0;
 }
