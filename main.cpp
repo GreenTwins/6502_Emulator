@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <iostream>
 
 //This will be an emulator for the 6502- an old 8 bit microprocessor that was used in MOS's KIM-1, Apple 1 & 2 with access to 64k bytes of RAM. Mem addresses are 16 bits in length w/ valid add from 0-65535
 //its called a 1 address machine b/c instructions can reference at most 1 addr at a time( its a 1 instruction per clock cycle system. So the exe time of an instruction is tightly coupled with the clock speed)
@@ -8,6 +8,7 @@
 
 //info: https://people.cs.umass.edu/~verts/cmpsci201/spr_2004/Lecture_02_2004-01-30_The_6502_processor.pdf
 //info: https://www.masswerk.at/6502/6502_instruction_set.html
+//info 2: http://www.6502.org/tutorials/6502opcodes.html#JMP
 
 //only has 3 registers and is little endian
 
@@ -136,7 +137,7 @@ struct CPU {
 				m.WriteWord(Cycles, PC - 1, SP);//this just does whats below
 				/*m[SP] = PC - 1;
 				--Cycles;*/
-				PC = SubAddress;
+				PC = SubAddress; //JSR returns control back to the "next" addr 
 				--Cycles;
 			}break;
 			default:
